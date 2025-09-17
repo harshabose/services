@@ -23,5 +23,6 @@ ffplay -fflags nobuffer -flags low_delay \
 */
 
 func main() {
-	<-rtsp.NewServer(context.Background(), nil).ServeAndWait()
+	server := rtsp.NewServer(context.Background(), nil)
+	<-server.Done()
 }

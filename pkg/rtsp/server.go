@@ -315,9 +315,7 @@ func (s *Server) Serve() {
 	s.metrics.SetState(ServerUpState)
 }
 
-func (s *Server) ServeAndWait() <-chan struct{} {
-	s.Serve()
-
+func (s *Server) Done() <-chan struct{} {
 	return s.ctx.Done()
 }
 
@@ -571,7 +569,7 @@ func (s *Server) OnConnClose(ctx *gortsplib.ServerHandlerOnConnCloseCtx) {
 	fmt.Printf("Connection closed from %s: %v\n", ctx.Conn.NetConn().RemoteAddr(), ctx.Error)
 }
 
-// OnSessionOpen is called after OnConnOpen and indicates RTSP session start.
+// OnSessionOpen is called after OnConnOpen and indicates RTSP process start.
 func (s *Server) OnSessionOpen(ctx *gortsplib.ServerHandlerOnSessionOpenCtx) {
 	clientID := fmt.Sprintf("%s-%d", ctx.Conn.NetConn().RemoteAddr(), time.Now().UnixNano())
 	fmt.Printf("Session opened: %s from %s\n", clientID, ctx.Conn.NetConn().RemoteAddr())
@@ -584,7 +582,7 @@ func (s *Server) OnSessionOpen(ctx *gortsplib.ServerHandlerOnSessionOpenCtx) {
 	})
 }
 
-// OnSessionClose is called after OnConnClose and indicates RTSP session close.
+// OnSessionClose is called after OnConnClose and indicates RTSP process close.
 func (s *Server) OnSessionClose(ctx *gortsplib.ServerHandlerOnSessionCloseCtx) {
 	userData := ctx.Session.UserData()
 	if userData == nil {
