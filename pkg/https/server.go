@@ -54,7 +54,7 @@ func NewHTTPSServer(ctx context.Context, config Config) *Server {
 	}
 
 	middleware.NewBuilder(router).AddMiddleware(
-		middleware.Logger(),
+		// middleware.Logger(),
 		s.CORS.Handler(&middleware.CORSSettings{
 			AllowedOrigins: []string{"*"},
 			AllowedHeaders: []string{
