@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/harshabose/services/pkg/rtsp"
 )
@@ -23,8 +24,13 @@ ffplay -fflags nobuffer -flags low_delay \
 */
 
 func main() {
-	server := rtsp.NewServer(context.Background(), nil)
+	ctx := context.Background()
 
+	server := rtsp.NewServer(ctx, nil)
 	server.Serve()
+
+	if err := server.WaitForConnection(2 * time.Second); err != nil {
+		panic(err)
+	}
 	<-server.Done()
 }

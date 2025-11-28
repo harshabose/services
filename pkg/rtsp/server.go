@@ -171,6 +171,13 @@ func (m *ServerMetrics) SetState(state ServerState) {
 	m.State = state
 }
 
+func (m *ServerMetrics) GetState() ServerState {
+	m.mux.RLock()
+	defer m.mux.RUnlock()
+
+	return m.State
+}
+
 func (m *ServerMetrics) IncrementTotalConnections() {
 	m.mux.Lock()
 	defer m.mux.Unlock()
@@ -279,14 +286,14 @@ func NewServer(ctx context.Context, config *ServerConfig) *Server {
 		config = DefaultServerConfig()
 	}
 
-	ctx2, cancel := context.WithCancel(ctx)
+	ctx2, cancel2 := context.WithCancel(ctx)
 
 	server := &Server{
 		config:  config,
 		streams: make(map[string]*StreamInfo),
 		ctx:     ctx2,
 		metrics: &ServerMetrics{maxErrorCount: 10},
-		cancel:  cancel,
+		cancel:  cancel2,
 	}
 
 	server.server = &gortsplib.Server{
@@ -311,8 +318,24 @@ func (s *Server) Serve() {
 	go s.connectionRoutine()
 	go s.cleanupRoutine()
 	go s.printMetrics()
+}
 
-	s.metrics.SetState(ServerUpState)
+func (s *Server) WaitForConnection(timeout time.Duration) error {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-time.After(timeout):
+			return fmt.Errorf("")
+		case <-ticker.C:
+			if state := s.metrics.GetState(); state != ServerUpState {
+				continue
+			}
+
+			return nil
+		}
+	}
 }
 
 func (s *Server) Done() <-chan struct{} {
