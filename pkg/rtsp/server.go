@@ -85,7 +85,7 @@ func DefaultServerConfig() *ServerConfig {
 		MulticastIPRange:        "224.1.0.0/16",
 		MulticastRTPPort:        8002,
 		MulticastRTCPPort:       8003,
-		WriteQueueSize:          256,
+		WriteQueueSize:          4096, // raising from 256 to 4096 to test in ffmpeg-c-api-trate-update branch testing; todo: remove later
 		ReServeAttempts:         30,
 		ReServerDelay:           3 * time.Second,
 		MetricsPrintInterval:    30 * time.Second,
