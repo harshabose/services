@@ -414,12 +414,9 @@ func (s *Server) connectionRoutine() {
 
 		select {
 		case <-s.ctx.Done():
-			fmt.Printf("RTSP server connection manager stopping due to context cancellation\n")
 			s.metrics.SetState(ServerDownState)
 			return
 		default:
-			fmt.Printf("Attempting to start the RTSP server: 0.0.0.0:%d\n", s.config.Port)
-
 			s.metrics.SetState(ServerUpState)
 			if err := s.server.StartAndWait(); err != nil {
 				s.metrics.SetState(ServerErrorState)
@@ -438,10 +435,8 @@ func (s *Server) connectionRoutine() {
 					return
 				}
 
-				fmt.Printf("Retyrying RTSP server start in %v (attempt %d)\n", currentDelay, attempt+1)
 				select {
 				case <-s.ctx.Done():
-					fmt.Printf("RTSP connection manager stopping during retry delay\n")
 					s.metrics.SetState(ServerDownState)
 					return
 				case <-time.After(currentDelay):
@@ -469,7 +464,6 @@ func (s *Server) printMetrics() {
 	for {
 		select {
 		case <-s.ctx.Done():
-			fmt.Printf("Metrics printing is stopped due to context cancellation")
 			return
 		case <-ticker.C:
 			s.printDetailedMetrics()
@@ -518,8 +512,6 @@ func (s *Server) printDetailedMetrics() {
 }
 
 func (s *Server) Close() error {
-	fmt.Println("Stopping RTSP prod...")
-
 	if s.cancel == nil {
 		return nil
 	}
@@ -527,14 +519,13 @@ func (s *Server) Close() error {
 
 	s.mux.Lock()
 
-	for path, streamInfo := range s.streams {
+	for _, streamInfo := range s.streams {
 		if streamInfo.Stream != nil {
 			streamInfo.Stream.Close()
 		}
 		if streamInfo.Publisher != nil {
 			streamInfo.Publisher.Close()
 		}
-		fmt.Printf("Closed stream: %s\n", path)
 	}
 	s.streams = make(map[string]*StreamInfo)
 	s.mux.Unlock()
@@ -547,8 +538,6 @@ func (s *Server) Close() error {
 
 	s.metrics.ResetTotalStreams()
 	s.metrics.ResetTotalConnections()
-
-	fmt.Println("RTSP prod stopped")
 	return nil
 }
 
@@ -581,21 +570,16 @@ func (s *Server) OnConnOpen(ctx *gortsplib.ServerHandlerOnConnOpenCtx) {
 	}
 
 	s.metrics.IncrementTotalConnections()
-
-	fmt.Printf("Connection opened from %s (total: %d)\n", ctx.Conn.NetConn().RemoteAddr(), s.metrics.GetTotalConnections())
 }
 
 // OnConnClose is called when a publisher/client disconnects TCP
-func (s *Server) OnConnClose(ctx *gortsplib.ServerHandlerOnConnCloseCtx) {
+func (s *Server) OnConnClose(_ *gortsplib.ServerHandlerOnConnCloseCtx) {
 	s.metrics.DecrementTotalConnections()
-
-	fmt.Printf("Connection closed from %s: %v\n", ctx.Conn.NetConn().RemoteAddr(), ctx.Error)
 }
 
 // OnSessionOpen is called after OnConnOpen and indicates RTSP process start.
 func (s *Server) OnSessionOpen(ctx *gortsplib.ServerHandlerOnSessionOpenCtx) {
 	clientID := fmt.Sprintf("%s-%d", ctx.Conn.NetConn().RemoteAddr(), time.Now().UnixNano())
-	fmt.Printf("Session opened: %s from %s\n", clientID, ctx.Conn.NetConn().RemoteAddr())
 
 	ctx.Session.SetUserData(map[string]interface{}{
 		"clientID":   clientID,
@@ -618,7 +602,6 @@ func (s *Server) OnSessionClose(ctx *gortsplib.ServerHandlerOnSessionCloseCtx) {
 	}
 
 	clientID, _ := userMap["clientID"].(string)
-	fmt.Printf("Session closed: %s\n", clientID)
 
 	s.mux.Lock()
 	defer s.mux.Unlock()
@@ -640,7 +623,6 @@ func (s *Server) OnSessionClose(ctx *gortsplib.ServerHandlerOnSessionCloseCtx) {
 
 func (s *Server) OnDescribe(ctx *gortsplib.ServerHandlerOnDescribeCtx) (*base.Response, *gortsplib.ServerStream, error) {
 	path := ctx.Path
-	fmt.Printf("Describe request for path: %s from %s\n", path, ctx.Conn.NetConn().RemoteAddr())
 
 	s.mux.RLock()
 	streamInfo, exists := s.streams[path]
@@ -665,7 +647,6 @@ func (s *Server) OnDescribe(ctx *gortsplib.ServerHandlerOnDescribeCtx) (*base.Re
 	// _ = tokens[0]
 
 	if !exists || streamInfo.Stream == nil {
-		fmt.Printf("Stream not found: %s\n", path)
 		return &base.Response{
 			StatusCode: base.StatusNotFound,
 		}, nil, nil
@@ -678,7 +659,6 @@ func (s *Server) OnDescribe(ctx *gortsplib.ServerHandlerOnDescribeCtx) (*base.Re
 
 func (s *Server) OnAnnounce(ctx *gortsplib.ServerHandlerOnAnnounceCtx) (*base.Response, error) {
 	path := ctx.Path
-	fmt.Printf("Announce request for path: %s from %s\n", path, ctx.Conn.NetConn().RemoteAddr())
 
 	s.mux.Lock()
 	defer s.mux.Unlock()
@@ -737,7 +717,6 @@ func (s *Server) OnAnnounce(ctx *gortsplib.ServerHandlerOnAnnounceCtx) (*base.Re
 	}
 
 	s.streams[path] = streamInfo
-	fmt.Printf("Stream created: %s\n", path)
 
 	s.metrics.IncrementTotalStreams()
 
@@ -748,7 +727,6 @@ func (s *Server) OnAnnounce(ctx *gortsplib.ServerHandlerOnAnnounceCtx) (*base.Re
 
 func (s *Server) OnSetup(ctx *gortsplib.ServerHandlerOnSetupCtx) (*base.Response, *gortsplib.ServerStream, error) {
 	path := ctx.Path
-	fmt.Printf("Setup request for path: %s from %s\n", path, ctx.Conn.NetConn().RemoteAddr())
 
 	s.mux.RLock()
 	streamInfo, exists := s.streams[path]
@@ -788,7 +766,6 @@ func (s *Server) OnSetup(ctx *gortsplib.ServerHandlerOnSetupCtx) (*base.Response
 			}
 
 			streamInfo.AddClient(client)
-			fmt.Printf("Client %s added to stream %s\n", clientID, path)
 		}
 	}
 
@@ -799,7 +776,6 @@ func (s *Server) OnSetup(ctx *gortsplib.ServerHandlerOnSetupCtx) (*base.Response
 
 func (s *Server) OnPlay(ctx *gortsplib.ServerHandlerOnPlayCtx) (*base.Response, error) {
 	path := ctx.Path
-	fmt.Printf("Play request for path: %s from %s\n", path, ctx.Conn.NetConn().RemoteAddr())
 
 	s.mux.RLock()
 	if streamInfo, exists := s.streams[path]; exists {
@@ -824,7 +800,6 @@ func (s *Server) OnPlay(ctx *gortsplib.ServerHandlerOnPlayCtx) (*base.Response, 
 
 func (s *Server) OnRecord(ctx *gortsplib.ServerHandlerOnRecordCtx) (*base.Response, error) {
 	path := ctx.Path
-	fmt.Printf("Record request for path: %s from %s\n", path, ctx.Conn.NetConn().RemoteAddr())
 
 	s.mux.RLock()
 	streamInfo, exists := s.streams[path]
