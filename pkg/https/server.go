@@ -43,8 +43,8 @@ func NewHTTPSServer(ctx context.Context, config Config) *Server {
 			WriteTimeout:      config.WriteTimeout,
 			Handler:           router,
 		},
-		metrics:     metrics.NewUnifiedMetrics(ctx2, "HTTP SERVER", 10, 30*time.Second),
-		RateLimiter: middleware.NewRateLimiter(10_000, time.Hour),
+		metrics:     metrics.NewUnifiedMetrics(ctx2, fmt.Sprintf("HTTP SERVER (%s:%d)", config.Addr, config.Port), 10, 30*time.Second),
+		RateLimiter: middleware.NewRateLimiter(config.RateLimiterMaxSize, time.Hour),
 		CORS:        middleware.NewCors(nil),
 		keepHosting: config.KeepHosting,
 		certPath:    config.CertPath,
@@ -53,7 +53,7 @@ func NewHTTPSServer(ctx context.Context, config Config) *Server {
 		cancel:      cancel,
 	}
 
-	middleware.NewBuilder(router).AddMiddleware(
+	s.AddHandler(NewMiddlewareBuilder().Add(
 		// middleware.Logger(),
 		s.CORS.Handler(&middleware.CORSSettings{
 			AllowedOrigins: []string{"*"},
@@ -78,21 +78,20 @@ func NewHTTPSServer(ctx context.Context, config Config) *Server {
 			MaxAge:        1800, // 30 minutes for status checks
 		}),
 		s.RateLimiter.Handler(120, 20),
-	).Build("GET /internal/http/metrics", s.metricsHandler())
+	), "GET /internal/http/metrics", s.metricsHandler())
 
 	return s
 }
 
-func (s *Server) Ctx() context.Context {
-	return s.ctx
+func (s *Server) AddHandler(builder *MiddlewareBuilder, pattern string, handler http.Handler) {
+	builder.build(s.router, pattern, handler)
 }
 
-func (s *Server) NewHandlerBuilder() *middleware.Builder {
-	return middleware.NewBuilder(s.router)
+func (s *Server) AddHandlerFunc(builder *MiddlewareBuilder, pattern string, handler http.HandlerFunc) {
+	builder.build(s.router, pattern, handler)
 }
 
 func (s *Server) Serve() {
-	s.wg.Add(1)
 	go s.start()
 }
 
@@ -101,6 +100,7 @@ func (s *Server) Done() <-chan struct{} {
 }
 
 func (s *Server) start() {
+	s.wg.Add(1)
 	defer s.wg.Done()
 	defer s.metrics.SetState(metrics.DisconnectedState)
 
@@ -172,7 +172,7 @@ func (s *Server) Close() error {
 		defer cancel()
 
 		if err = s.httpServer.Shutdown(ctx); err != nil {
-			fmt.Printf("graceful shutdown not possible. Closing forcibily...")
+			fmt.Printf("graceful shutdown not possible. closing forcibly...")
 			if err := s.httpServer.Close(); err != nil {
 				fmt.Printf("error while closing http server: %v", err)
 			}

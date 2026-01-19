@@ -17,6 +17,8 @@ var (
 	ErrMethodNotAllowed = errors.New("method not allowed")
 )
 
+var DefaultAllowedHeaders = hashset.New("accept", "accept-language", "content-language", "user-agent", "content-type", "cache-control", "expires", "last-modified", "pragma")
+
 type CORSSettings struct {
 	AllowedOrigins   []string
 	AllowedHeaders   []string
@@ -59,7 +61,7 @@ func NewCors(settings *CORSSettings) *Cors {
 	}
 }
 
-func (m *Cors) Handler(settings *CORSSettings) Middleware {
+func (m *Cors) Handler(settings *CORSSettings) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !m.isSettingsValid(settings) {
@@ -225,9 +227,7 @@ func (m *Cors) isHeaderAllowed(header string, settings *CORSSettings) error {
 			return false
 		}
 
-		if hashset.New("accept", "accept-language", "content-language", "user-agent",
-			"content-type", "cache-control", "expires", "last-modified", "pragma").
-			Contains(strings.TrimSpace(strings.ToLower(header))) {
+		if DefaultAllowedHeaders.Contains(strings.TrimSpace(strings.ToLower(header))) {
 			return true
 		}
 

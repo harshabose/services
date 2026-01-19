@@ -11,6 +11,9 @@ type Config struct {
 	WriteTimeout time.Duration `json:"write_timeout"`
 	KeepHosting  bool          `json:"keep_hosting"`
 
+	RateLimiterMaxSize int           `json:"rate_limiter_max_size"`
+	RateLimiterTTL     time.Duration `json:"rate_limiter_ttl"`
+
 	CertPath string `json:"-"`
 	KeyFile  string `json:"-"`
 }
@@ -37,5 +40,9 @@ func (c *Config) SetDefaults() {
 
 	if c.WriteTimeout == 0 {
 		c.WriteTimeout = 30 * time.Second
+	}
+
+	if c.RateLimiterTTL == 0 {
+		c.RateLimiterTTL = time.Hour
 	}
 }

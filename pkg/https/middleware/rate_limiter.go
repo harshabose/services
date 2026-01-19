@@ -21,7 +21,7 @@ func NewRateLimiter(size int, ttl time.Duration) *RateLimiter {
 	}
 }
 
-func (m *RateLimiter) Handler(limit int, burst int) Middleware {
+func (m *RateLimiter) Handler(limit int, burst int) func(http.Handler) http.Handler {
 	// NOTE: limit is in requests per second
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
